@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Anna University GPA & CGPA Calculator</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #f0f4f8;
+      padding: 20px;
+    }
+    h1 {
+      text-align: center;
+    }
+    input[type="text"], input[type="number"] {
+      margin-bottom: 10px;
+      padding: 6px;
+      width: 200px;
+      display: block;
+      margin: 10px auto;
+    }
+    .semester {
+      background: #fff;
+      padding: 15px;
+      margin-bottom: 20px;
+      border-radius: 8px;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+    }
+    .subject {
+      margin-bottom: 10px;
+      text-align: center;
+    }
+    input.subject-name {
+      width: 220px;
+      display: inline-block;
+    }
+    input.credit, input.grade {
+      width: 100px;
+      display: inline-block;
+    }
+    button {
+      padding: 8px 12px;
+      margin-top: 10px;
+      background: #007bff;
+      color: #fff;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+    }
+    button:hover {
+      background: #0056b3;
+    }
+    .result {
+      font-weight: bold;
+      margin-top: 10px;
+      color: green;
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+
+<h1>Anna University GPA & CGPA Calculator</h1>
+<input type="text" id="studentName" placeholder="Enter your name">
+
+<div id="semesters"></div>
+
+<button onclick="calculateAll()">Calculate GPA & CGPA</button>
+<button onclick="downloadPDF()">Download PDF</button>
+
+<div class="result" id="cgpaResult"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script>
+  const semestersContainer = document.getElementById("semesters");
+
+  for (var sem = 1; sem <= 8; sem++) {
+    var semesterDiv = document.createElement("div");
+    semesterDiv.className = "semester";
+    semesterDiv.id = `semester${sem}`;
+
+    semesterDiv.innerHTML = `
+      <h3>Semester ${sem}</h3>
+      <div class="subjects" id="subjects${sem}"></div>
+      <button onclick="addSubject(${sem})">Add Subject</button>
+      <div class="result" id="gpa${sem}"></div>
+    `;
+
+    semestersContainer.appendChild(semesterDiv);
+    addSubject(sem);
+  }
+
+  function addSubject(sem) {
+    var subjectsDiv = document.getElementById(`subjects${sem}`);
+    var subjectDiv = document.createElement("div");
+    subjectDiv.className = "subject";
+    subjectDiv.innerHTML = `
+      <input type="text" placeholder="Subject Name" class="subject-name">
+      <input type="number" placeholder="Credits" min="0" class="credit">
+      <input type="number" placeholder="Grade Point" min="0" max="10" class="grade">
+      <button onclick="this.parentElement.remove()">Remove</button>
+    `;
+    subjectsDiv.appendChild(subjectDiv);
+  }
+
+  function calculateAll() {
+    var totalCGPA = 0;
+    var totalCredits = 0;
+    var cgpaOutput = document.getElementById("cgpaResult");
+
+    // Clear previous GPA displays
+    for (let s = 1; s <= 8; s++) {
+      document.getElementById(`gpa${s}`).innerText = "";
+    }
+
+    // Store arrears to move to next semester
+    let arrears = {};
+
+    for (let sem = 1; sem <= 8; sem++) {
+      // Add previous semester arrears
+      if (arrears[sem]) {
+        arrears[sem].forEach((subjectHTML) => {
+          document.getElementById(`subjects${sem}`).appendChild(subjectHTML);
+        });
+        arrears[sem] = [];
+      }
+
+      let subjects = document.querySelectorAll(`#semester${sem} .subject`);
+      let semCredits = 0;
+      let semPoints = 0;
+      arrears[sem + 1] = arrears[sem + 1] || [];
+
+      subjects.forEach(function (subject) {
+        let credit = parseFloat(subject.querySelector(".credit").value) || 0;
+        let grade = parseFloat(subject.querySelector(".grade").value) || 0;
+
+        if (grade === 0) {
+          if (sem < 8) {
+            arrears[sem + 1].push(subject.cloneNode(true));
+            subject.remove();
+          }
+          return;
+        }
+
+        semCredits += credit;
+        semPoints += credit * grade;
+      });
+
+      let gpa = semCredits ? (semPoints / semCredits).toFixed(2) : "0.00";
+      document.getElementById(`gpa${sem}`).innerText = `GPA: ${gpa}`;
+      totalCGPA += parseFloat(gpa) * semCredits;
+      totalCredits += semCredits;
+    }
+
+    let cgpa = totalCredits ? (totalCGPA / totalCredits).toFixed(2) : "0.00";
+    cgpaOutput.innerHTML = `Overall CGPA: ${cgpa}`;
+  }
+
+  async function downloadPDF() {
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF();
+    var name = document.getElementById("studentName").value.trim();
+    if (!name) {
+      alert("Please enter your name.");
+      return;
+    }
+
+    var y = 10;
+    doc.setFontSize(16);
+    doc.text("Anna University GPA & CGPA Report", 10, y);
+    y += 10;
+    doc.setFontSize(12);
+    doc.text("Name: " + name, 10, y);
+    y += 10;
+
+    var totalCGPA = 0;
+    var totalCredits = 0;
+
+    for (var sem = 1; sem <= 8; sem++) {
+      var subjects = document.querySelectorAll(`#semester${sem} .subject`);
+      if (subjects.length === 0) continue;
+
+      var semCredits = 0;
+      var semPoints = 0;
+      y += 6;
+      doc.text(`Semester ${sem}`, 10, y);
+      y += 6;
+      doc.setFontSize(10);
+
+      subjects.forEach(function(subject, index) {
+        var subjectName = subject.querySelector(".subject-name").value.trim() || `Subject ${index + 1}`;
+        var credit = parseFloat(subject.querySelector(".credit").value) || 0;
+        var grade = parseFloat(subject.querySelector(".grade").value) || 0;
+
+        doc.text(`${subjectName}: Credit ${credit}, Grade ${grade}`, 12, y);
+        y += 5;
+
+        if (grade === 0) return; // skip in GPA calculation
+
+        semCredits += credit;
+        semPoints += credit * grade;
+      });
+
+      var gpa = semCredits ? (semPoints / semCredits).toFixed(2) : "0.00";
+      doc.setFontSize(11);
+      doc.text(`GPA: ${gpa}`, 12, y);
+      totalCGPA += parseFloat(gpa) * semCredits;
+      totalCredits += semCredits;
+      y += 8;
+
+      if (y > 270) {
+        doc.addPage();
+        y = 10;
+      }
+    }
+
+    var cgpa = totalCredits ? (totalCGPA / totalCredits).toFixed(2) : "0.00";
+
+    doc.setFontSize(12);
+    doc.text("Overall CGPA: " + cgpa, 10, y + 5);
+
+    doc.save(`${name}_GPA_CGPA_Report.pdf`);
+  }
+</script>
+
+</body>
+</html>
